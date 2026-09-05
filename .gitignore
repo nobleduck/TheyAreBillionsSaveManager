@@ -1,0 +1,15 @@
+dist/
+build/
+**/bin/
+**/obj/
+.vs/
+.superpowers/
+*.user
+*.suo
+*.zxsav
+*.zxcheck
+*.zxuser
+*.zxcampaign
+settings.json
+Snapshots/
+*.log
