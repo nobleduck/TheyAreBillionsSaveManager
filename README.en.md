@@ -8,7 +8,7 @@ A Windows desktop utility that keeps paired save snapshots and restores survival
 
 ## Run without building
 
-Download `TheyAreBillionsSaveManager-v0.2.0-windows.zip` from the release's **Assets**, extract it, and double-click **Start.cmd**. You can also run **dist/TheyAreBillionsSaveManager.exe**, or download the standalone EXE. The **Source code** downloads require building first.
+Download `TheyAreBillionsSaveManager-v0.2.1-windows.zip` from the release's **Assets**, extract it, and double-click **Start.cmd**. You can also run **dist/TheyAreBillionsSaveManager.exe**, or download the standalone EXE. The **Source code** downloads require building first.
 
 Uses the .NET Framework included with Windows 10 / 11. No Python, Node.js, NuGet downloads or installer required. Steam and the game must already be installed. `SHA256SUMS.txt` contains SHA-256 hashes for the EXE and ZIP.
 

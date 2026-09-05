@@ -8,7 +8,7 @@
 
 ## 直接使用
 
-在 Release 的 **Assets** 中下载 `TheyAreBillionsSaveManager-v0.2.0-windows.zip` 并解压。GitHub 自动提供的 **Source code** 是源码，需要自己构建。
+在 Release 的 **Assets** 中下载 `TheyAreBillionsSaveManager-v0.2.1-windows.zip` 并解压。GitHub 自动提供的 **Source code** 是源码，需要自己构建。
 
 双击项目根目录中的 **`Start.cmd`**，或者运行 **`dist/TheyAreBillionsSaveManager.exe`**。程序使用 Windows 10 / 11 自带的 .NET Framework，不需要 Python、Node.js 或额外安装包。
 
@@ -105,7 +105,7 @@ Steam 在启动前会检查存档。如果只在游戏关闭时移开主存档�
 .\build.ps1 -Test -Package
 ```
 
-产物为 `dist/TheyAreBillionsSaveManager-v0.2.0-windows.zip`、独立 EXE 和 `SHA256SUMS.txt`。版本号统一由根目录 `VERSION` 控制。
+产物为 `dist/TheyAreBillionsSaveManager-v0.2.1-windows.zip`、独立 EXE 和 `SHA256SUMS.txt`。版本号统一由根目录 `VERSION` 控制。
 
 构建脚本会执行检查并生成下载包。发布步骤见 [发布指南](docs/RELEASING.md)。
 

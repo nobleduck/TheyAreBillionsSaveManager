@@ -1,5 +1,15 @@
 # Changelog / 更新记录
 
+## 0.2.1 — 2026-09-05
+
+- Fix idle button flicker caused by the once-per-second game-state check temporarily disabling controls.
+- Keep operation locks during automatic snapshots and restores; game start/exit still changes restore availability.
+- Add a UI regression check for stable controls across repeated idle polls and real game-state transitions.
+
+- 修复每秒检查游戏状态时反复禁用、启用按钮造成的闪烁。
+- 保留自动备份和回退期间的操作保护，游戏启动、退出时仍正确更新回退按钮。
+- 增加空闲轮询与游戏状态切换的界面回归检查。
+
 ## 0.2.0 — 2026-09-05
 
 - English and Simplified Chinese UI, current Windows display-language detection, instant language switching and saved preferences.

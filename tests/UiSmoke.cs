@@ -12,6 +12,13 @@ internal static class UiSmoke
         public GameObservation Observe() { return new GameObservation(); }
         public void Launch() { throw new InvalidOperationException("UI fixture cannot launch a real game."); }
     }
+    private sealed class PollingHost : IGameHost
+    {
+        public int Observations;
+        public bool Running;
+        public GameObservation Observe() { Observations++; return new GameObservation { Running = Running }; }
+        public void Launch() { throw new InvalidOperationException("Polling fixture cannot launch a real game."); }
+    }
     [STAThread]
     private static int Main(string[] args)
     {
@@ -67,13 +74,60 @@ internal static class UiSmoke
                 };
                 form.Shown += delegate { timer.Start(); }; Application.Run(form);
             }
-            Console.WriteLine("UI smoke " + (passed ? "passed" : "failed") + "; rendered both languages at normal/minimum size and verified switching, selection and persistence."); return passed ? 0 : 1;
+            passed = VerifyIdlePolling(saves,snapshots) && passed;
+            Console.WriteLine("UI smoke " + (passed ? "passed" : "failed") + "; verified both languages, layouts, persistence and stable idle controls."); return passed ? 0 : 1;
         }
         finally
         {
             string resolved = Path.GetFullPath(fixture);
             if (resolved.StartsWith(Path.GetFullPath(Path.GetTempPath()),StringComparison.OrdinalIgnoreCase) && Path.GetFileName(resolved).StartsWith("TABUiSmoke-")) Directory.Delete(resolved,true);
         }
+    }
+    private static bool VerifyIdlePolling(string saves, string snapshots)
+    {
+        var host = new PollingHost();
+        bool passed = true;
+        using (var form = new MainForm(new AppSettings { SaveDirectory = saves, ArchiveDirectory = snapshots, AutomaticSnapshots = false, Language = "en" },null,host))
+        using (var watch = new Timer { Interval = 50 })
+        {
+            var changes = new System.Collections.Generic.List<string>();
+            Button restore = null; int baseline = 0, stage = 0; DateTime started = DateTime.UtcNow;
+            form.Shown += delegate {
+                form.BeginInvoke(new Action(delegate {
+                    restore = FindControls<Button>(form).Single(button => button.Text == "Launch & restore");
+                    foreach (var control in FindControls<Control>(form).Where(c => c is Button || c is ComboBox || c is TabControl || c is CheckBox))
+                    {
+                        Control watched = control;
+                        watched.EnabledChanged += delegate { changes.Add(watched.Text + ":" + watched.Enabled); };
+                    }
+                    baseline = host.Observations; watch.Start();
+                }));
+            };
+            watch.Tick += delegate {
+                try {
+                    if (DateTime.UtcNow - started > TimeSpan.FromSeconds(12)) throw new Exception("Polling test timed out.");
+                    if (stage == 0 && host.Observations >= baseline + 3)
+                    {
+                        if (!restore.Enabled || changes.Count != 0) throw new Exception("Idle checks toggled controls: " + string.Join(", ",changes.ToArray()));
+                        host.Running = true; baseline = host.Observations; stage++;
+                    }
+                    else if (stage == 1 && host.Observations > baseline)
+                    {
+                        if (restore.Enabled || changes.Count != 1) throw new Exception("Running game did not disable restore exactly once.");
+                        host.Running = false; baseline = host.Observations; stage++;
+                    }
+                    else if (stage == 2 && host.Observations > baseline)
+                    {
+                        if (!restore.Enabled || changes.Count != 2) throw new Exception("Game exit did not re-enable restore exactly once.");
+                        Console.WriteLine("PASS idle polling keeps controls stable; game start/exit still updates restore availability.");
+                        watch.Stop(); form.Close();
+                    }
+                }
+                catch (Exception error) { passed = false; Console.WriteLine("FAIL idle polling: " + error.Message); watch.Stop(); form.Close(); }
+            };
+            Application.Run(form);
+        }
+        return passed;
     }
     private static System.Collections.Generic.IEnumerable<T> FindControls<T>(Control parent) where T : Control
     {

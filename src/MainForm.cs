@@ -238,7 +238,8 @@ namespace BillionsSaveManager
         }
         private void UpdateButtons()
         {
-            bool blocked = working || polling || (coordinator != null && coordinator.Busy);
+            // The timer's re-entry guard is not a user-visible operation.
+            bool blocked = working || (coordinator != null && coordinator.Busy);
             restoreButton.Enabled = store != null && SelectedPair() != null && !blocked && !gameRunning;
             captureButton.Enabled = store != null && SelectedPair() != null && !blocked;
             refreshButton.Enabled = store != null && !blocked; folderButton.Enabled = !blocked;
@@ -292,10 +293,14 @@ namespace BillionsSaveManager
                 CheckGame();
                 if ((coordinator == null || !coordinator.Busy) && automaticBox.Checked && ++ticks >= 15)
                 {
-                    ticks = 0;
-                    var messages = await Task.Run(delegate { return AutoCapture(); });
-                    foreach (string message in messages) Log(message);
-                    if (messages.Count > 0) Populate();
+                    ticks = 0; working = true; UpdateButtons();
+                    try
+                    {
+                        var messages = await Task.Run(delegate { return AutoCapture(); });
+                        foreach (string message in messages) Log(message);
+                        if (messages.Count > 0) Populate();
+                    }
+                    finally { working = false; }
                 }
             }
             catch (Exception error) { Log(error.Message); }
