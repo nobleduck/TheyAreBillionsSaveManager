@@ -16,34 +16,37 @@ namespace BillionsSaveManager
         private string armedLog;
         private DateTime armedUtc;
         public RollbackState State { get; private set; }
-        public string Message { get; private set; }
+        private string messageTemplate;
+        private Exception failureException;
+        private object[] messageArguments = new object[0];
+        public string Message { get { return failureException != null ? failureException.Message : L.T(messageTemplate, messageArguments); } }
         public SavePair Target { get; private set; }
         public bool Busy { get { return State == RollbackState.WaitingForMenu || State == RollbackState.AwaitingLoad; } }
         public RollbackCoordinator(SaveStore store, IGameHost host, Func<DateTime> now)
-        { this.store = store; this.host = host; this.now = now; State = RollbackState.Idle; Message = "选择一个恢复点，然后启动游戏并回退。"; }
+        { this.store = store; this.host = host; this.now = now; State = RollbackState.Idle; SetMessage("选择一个恢复点，然后启动游戏并回退。"); }
 
         public void Begin(SavePair pair)
         {
-            if (Busy) throw new InvalidOperationException("已有回退正在进行。");
+            if (Busy) throw new LocalizedInvalidOperationException("已有回退正在进行。");
             var observation = host.Observe();
-            if (observation.Running) throw new InvalidOperationException("请先正常保存并退出游戏，再启动回退。工具不会强制关闭游戏。");
-            if (pair == null) throw new InvalidOperationException("请先选择一个恢复点。");
+            if (observation.Running) throw new LocalizedInvalidOperationException("请先正常保存并退出游戏，再启动回退。工具不会强制关闭游戏。");
+            if (pair == null) throw new LocalizedInvalidOperationException("请先选择一个恢复点。");
             if (string.IsNullOrEmpty(pair.SnapshotId))
             {
-                var snapshot = store.Capture(pair.SaveName, "选定恢复点", false);
+                var snapshot = store.Capture(pair.SaveName, "selected", false);
                 Target = store.GetPairs(snapshot).Single(p => p.FileStem == pair.FileStem);
             }
             else
             {
                 var snapshot = store.GetSnapshots().SingleOrDefault(s => s.Id == pair.SnapshotId);
-                if (snapshot == null) throw new IOException("找不到该快照，请刷新列表。");
+                if (snapshot == null) throw new LocalizedIOException("找不到该快照，请刷新列表。");
                 Target = store.GetPairs(snapshot).Single(p => p.FileStem == pair.FileStem);
             }
             originalLog = observation.LogText; beganUtc = now(); processId = 0;
             State = RollbackState.WaitingForMenu;
-            Message = "正在通过 Steam 启动游戏。请停在主菜单，暂时不要点击继续。";
+            SetMessage("正在通过 Steam 启动游戏。请停在主菜单，暂时不要点击继续。");
             try { host.Launch(); }
-            catch (Exception e) { Fail("启动失败：" + e.Message); throw; }
+            catch (Exception e) { Fail(new LocalizedInvalidOperationException("启动失败：{0}", e)); throw; }
         }
 
         public void Poll()
@@ -70,7 +73,7 @@ namespace BillionsSaveManager
                     });
                     armedLog = observation.LogText; armedUtc = now();
                     State = RollbackState.AwaitingLoad;
-                    Message = "现在可以点击「继续」了！请选择 " + Target.SaveName + "，直接在当前游戏里加载，暂时不要重启。";
+                    SetMessage("现在可以点击「继续」了！请选择 {0}，直接在当前游戏里加载，暂时不要重启。", Target.SaveName);
                 }
                 else if (State == RollbackState.AwaitingLoad)
                 {
@@ -85,14 +88,16 @@ namespace BillionsSaveManager
                     { Fail("日志显示加载了其他存档，本次未确认回退成功。请检查选择的游戏进度。"); return; }
                     store.VerifyActiveTarget(Target);
                     State = RollbackState.Loaded;
-                    Message = "已确认加载 " + Target.SavedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss") + " 的恢复点。可以继续玩；结束时正常保存退出，再等待 Steam 云同步完成。";
+                    SetMessage("已确认加载 {0} 的恢复点。可以继续玩；结束时正常保存退出，再等待 Steam 云同步完成。", Target.SavedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss"));
                 }
             }
-            catch (Exception e) { Fail(e.Message); }
+            catch (Exception e) { Fail(e); }
         }
 
         private bool SameSession(GameObservation observation)
         { return observation.Running && observation.ProcessId == processId && observation.StartedUtc == processStartedUtc; }
-        private void Fail(string message) { State = RollbackState.Failed; Message = message; }
+        private void SetMessage(string template, params object[] args) { failureException = null; messageTemplate = template; messageArguments = args; }
+        private void Fail(Exception error) { State = RollbackState.Failed; failureException = error; }
+        private void Fail(string message, params object[] args) { State = RollbackState.Failed; SetMessage(message, args); }
     }
 }

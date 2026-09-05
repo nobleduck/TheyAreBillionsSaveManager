@@ -10,6 +10,7 @@ namespace BillionsSaveManager
         [DataMember] public string SaveDirectory;
         [DataMember] public string ArchiveDirectory;
         [DataMember] public bool AutomaticSnapshots = true;
+        [DataMember(EmitDefaultValue = false)] public string Language;
         public static AppSettings Defaults()
         {
             return new AppSettings

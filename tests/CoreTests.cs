@@ -156,6 +156,7 @@ internal static class CoreTests
             }
         });
         CoordinatorTests();
+        LocalizationTests.Run(Run);
         Console.WriteLine("RESULT: " + passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1;
     }
 
@@ -279,6 +280,7 @@ internal static class CoreTests
             }
         });
         Run("modified target cannot be verified from filename alone", delegate {
+            L.SetLanguage("en");
             using (var f = new Fixture()) {
                 f.Pair("Colony","new"); f.Pair("Colony_Backup","old"); DateTime now = DateTime.UtcNow;
                 var host = new TestHost(); host.OnLaunch = delegate { host.MenuAt(now); };
@@ -287,6 +289,10 @@ internal static class CoreTests
                 f.Pair("Colony_Backup","externally-replaced");
                 host.Current.LogText += "20:01 - Loading game: " + Path.Combine(f.Store.SaveDirectory,"Colony_Backup.zxsav") + "\n20:01 - LoadLevel - Gamestate Loaded\n";
                 coordinator.Poll(); Check(coordinator.State != RollbackState.Loaded,"Changed target content was incorrectly verified.");
+                L.SetLanguage("en"); string english = coordinator.Message;
+                L.SetLanguage("zh-CN"); string chinese = coordinator.Message;
+                Check(english != chinese && !english.Any(c => c >= '\u4e00' && c <= '\u9fff') && chinese.Any(c => c >= '\u4e00' && c <= '\u9fff'), "Failed restore status did not follow language changes.");
+                L.SetLanguage("en"); Check(coordinator.Message == english, "Failed status could not switch back to English.");
             }
         });
     }

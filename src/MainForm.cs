@@ -25,6 +25,8 @@ namespace BillionsSaveManager
         private readonly TabControl tabs = new TabControl();
         private readonly TextBox activity = new TextBox();
         private readonly Timer timer = new Timer();
+        private readonly ComboBox languageBox = new ComboBox();
+        private readonly Dictionary<Control,string> textBindings = new Dictionary<Control,string>();
         private readonly Dictionary<string,string> observedVersions = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
         private bool working, polling, gameRunning, populating;
         private int ticks;
@@ -35,13 +37,15 @@ namespace BillionsSaveManager
         public MainForm(AppSettings settings, string settingsPath, IGameHost injectedHost)
         {
             this.settings = settings; this.settingsPath = settingsPath; this.injectedHost = injectedHost;
+            L.SetLanguage(settings.Language);
             Text = "They Are Billions · 存档回退助手";
             Font = new Font("Microsoft YaHei UI", 9F);
             BackColor = Color.FromArgb(245, 247, 249);
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1040, 780); MinimumSize = new Size(900, 720);
             AutoScaleMode = AutoScaleMode.Dpi;
-            BuildLayout(); InitializeStore();
+            BuildLayout(); RememberText(this); ApplyLanguage(); InitializeStore();
+            languageBox.SelectedIndexChanged += ChangeLanguage;
             timer.Interval = 1000; timer.Tick += TickAsync;
             Shown += delegate {
                 BeginInvoke(new Action(delegate {
@@ -69,6 +73,12 @@ namespace BillionsSaveManager
             var heading = new Panel { Dock = DockStyle.Fill };
             heading.Controls.Add(new Label { Text = "存档回退助手", Font = new Font(Font.FontFamily, 22F, FontStyle.Bold), AutoSize = true, Location = new Point(0, 0), ForeColor = Color.FromArgb(30, 40, 51) });
             heading.Controls.Add(new Label { Text = "THEY ARE BILLIONS  /  保存一个重新来过的机会", AutoSize = true, Location = new Point(2, 43), ForeColor = Color.DimGray });
+            var languageRow = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 250, FlowDirection = FlowDirection.LeftToRight };
+            languageRow.Controls.Add(new Label { Text = "语言 / Language", AutoSize = true, Margin = new Padding(0,7,8,0) });
+            languageBox.Name = "languageBox"; languageBox.DropDownStyle = ComboBoxStyle.DropDownList; languageBox.Width = 125;
+            languageBox.Items.AddRange(new object[] { "简体中文", "English" });
+            languageBox.SelectedIndex = L.Language == "zh-CN" ? 0 : 1;
+            languageRow.Controls.Add(languageBox); heading.Controls.Add(languageRow);
             root.Controls.Add(heading, 0, 0);
 
             var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
@@ -84,7 +94,7 @@ namespace BillionsSaveManager
             card.Controls.Add(statusTitle,0,0); card.Controls.Add(statusDetail,0,1); root.Controls.Add(card,0,2);
 
             var tools = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5 };
-            tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,88)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,110)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,130)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,130));
+            tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,88)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,125)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,130)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100)); tools.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,145));
             StyleButton(refreshButton,"刷新列表",false); refreshButton.Click += async delegate { await RefreshAsync(); };
             StyleButton(captureButton,"备份选中存档",false); captureButton.Click += CaptureAsync;
             var openButton = new Button(); StyleButton(openButton,"打开快照目录",false); openButton.Click += delegate { OpenArchive(); };
@@ -108,7 +118,7 @@ namespace BillionsSaveManager
 
             var actionRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(0,8,0,4) };
             actionRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100)); actionRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,195));
-            selectionDetail.Dock = DockStyle.Fill; selectionDetail.TextAlign = ContentAlignment.MiddleLeft; selectionDetail.AutoEllipsis = true;
+            selectionDetail.Name = "selectionDetail"; selectionDetail.Dock = DockStyle.Fill; selectionDetail.TextAlign = ContentAlignment.MiddleLeft; selectionDetail.AutoEllipsis = true;
             StyleButton(restoreButton,"启动游戏并回退",true); restoreButton.Click += RestoreAsync;
             actionRow.Controls.Add(selectionDetail,0,0); actionRow.Controls.Add(restoreButton,1,0); root.Controls.Add(actionRow,0,5);
             activity.Dock = DockStyle.Fill; activity.Multiline = true; activity.ReadOnly = true; activity.ScrollBars = ScrollBars.Vertical; activity.BackColor = Color.White; activity.BorderStyle = BorderStyle.FixedSingle;
@@ -121,8 +131,41 @@ namespace BillionsSaveManager
             return new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, RowTemplate = { Height = 32 }, ColumnHeadersHeight = 36, EnableHeadersVisualStyles = false, ColumnHeadersDefaultCellStyle = { BackColor = Color.FromArgb(235,240,243), ForeColor = Color.FromArgb(38,49,61) }, DefaultCellStyle = { SelectionBackColor = Color.FromArgb(219,239,232), SelectionForeColor = Color.FromArgb(16,63,50) } };
         }
 
+        private void RememberText(Control control)
+        {
+            if (L.HasKey(control.Text)) textBindings.Add(control,control.Text);
+            foreach (Control child in control.Controls) RememberText(child);
+        }
+        private void ApplyLanguage()
+        {
+            foreach (var binding in textBindings) binding.Key.Text = L.T(binding.Value);
+            foreach (var grid in new[] { localGrid, historyGrid })
+            {
+                string[] headers = { "存档名称", "类型", "游戏保存时间", "大小", grid == localGrid ? "回退时间" : "快照创建时间 / 原因" };
+                for (int i = 0; i < headers.Length; i++) grid.Columns[i].HeaderText = L.T(headers[i]);
+            }
+        }
+        private void ChangeLanguage(object sender, EventArgs e)
+        {
+            if (working || polling || (coordinator != null && coordinator.Busy)) return;
+            settings.Language = languageBox.SelectedIndex == 0 ? "zh-CN" : "en";
+            L.SetLanguage(settings.Language); ApplyLanguage(); SaveSettings();
+            if (store != null)
+            {
+                pathLabel.Text = L.T("存档目录：{0}", store.SaveDirectory);
+                try { Populate(); CheckGame(); }
+                catch (Exception error) { Log(error.Message); }
+                if (coordinator.State == RollbackState.Idle)
+                    SetStatus(L.T("先选择想回到的保存点"), L.T("回退前请正常退出游戏。工具会先备份、启动游戏并等待主菜单；看到“可以继续”后再点击游戏中的继续。"),false);
+                else { lastCoordinatorMessage = ""; ShowCoordinator(); }
+            }
+            else InitializeStore();
+            Log(L.T("语言已切换；已记录的活动消息保留原来的语言。"));
+        }
+
         private void StyleButton(Button button, string text, bool primary)
         {
+            button.UseMnemonic = false;
             button.Text = text; button.Dock = DockStyle.Fill; button.Margin = new Padding(0,4,8,4); button.FlatStyle = FlatStyle.Flat; button.FlatAppearance.BorderColor = Color.FromArgb(208,216,221);
             button.BackColor = primary ? accent : Color.White; button.ForeColor = primary ? Color.White : Color.FromArgb(38,49,61);
             if (primary) { button.Font = new Font(Font, FontStyle.Bold); button.Margin = new Padding(8,0,0,0); }
@@ -135,11 +178,11 @@ namespace BillionsSaveManager
                 store = new SaveStore(settings.SaveDirectory,settings.ArchiveDirectory);
                 host = injectedHost ?? new WindowsGameHost(store.SaveDirectory);
                 coordinator = new RollbackCoordinator(store,host,delegate { return DateTime.UtcNow; });
-                observedVersions.Clear(); pathLabel.Text = "存档目录：" + store.SaveDirectory;
-                SetStatus("先选择想回到的保存点", "回退前请正常退出游戏。工具会先备份、启动游戏并等待主菜单；看到“可以继续”后再点击游戏中的继续。", false);
+                observedVersions.Clear(); pathLabel.Text = L.T("存档目录：{0}", store.SaveDirectory);
+                SetStatus(L.T("先选择想回到的保存点"), L.T("回退前请正常退出游戏。工具会先备份、启动游戏并等待主菜单；看到“可以继续”后再点击游戏中的继续。"), false);
                 Populate(); CheckGame();
             }
-            catch (Exception e) { store = null; host = null; coordinator = null; pathLabel.Text = settings.SaveDirectory; SetStatus("需要设置存档目录",e.Message,true); }
+            catch (Exception e) { store = null; host = null; coordinator = null; pathLabel.Text = settings.SaveDirectory; SetStatus(L.T("需要设置存档目录"),e.Message,true); }
             UpdateButtons();
         }
 
@@ -155,11 +198,11 @@ namespace BillionsSaveManager
             foreach (var pair in locals)
             {
                 var main = locals.FirstOrDefault(p => p.SaveName == pair.SaveName && !p.IsBackup);
-                string delta = pair.IsBackup && main != null ? Difference(main.SavedAtUtc - pair.SavedAtUtc) : pair.IsBackup ? "仅剩自动备份" : "当前进度";
+                string delta = pair.IsBackup && main != null ? Difference(main.SavedAtUtc - pair.SavedAtUtc) : pair.IsBackup ? L.T("仅剩自动备份") : L.T("当前进度");
                 AddRow(localGrid,pair,delta);
             }
             foreach (var snapshot in snapshots)
-                foreach (var pair in store.GetPairs(snapshot)) AddRow(historyGrid,pair,snapshot.CreatedUtc.ToLocalTime().ToString("MM-dd HH:mm:ss") + " / " + snapshot.Reason);
+                foreach (var pair in store.GetPairs(snapshot)) AddRow(historyGrid,pair,snapshot.CreatedUtc.ToLocalTime().ToString("MM-dd HH:mm:ss") + " / " + L.Reason(snapshot.Reason));
             var selectedGrid = tabs.SelectedIndex == 0 ? localGrid : historyGrid;
             DataGridViewRow found = selectedGrid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => Key(r.Tag as SavePair) == previousKey);
             if (found == null && tabs.SelectedIndex == 0) found = selectedGrid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => ((SavePair)r.Tag).IsBackup);
@@ -172,13 +215,13 @@ namespace BillionsSaveManager
 
         private static string Difference(TimeSpan span)
         {
-            if (span.TotalSeconds < 0) return "备份时间较新，请核对";
-            return string.Format("约回退 {0} 分 {1} 秒", (int)span.TotalMinutes, span.Seconds);
+            if (span.TotalSeconds < 0) return L.T("备份时间较新，请核对");
+            return string.Format(L.T("约回退 {0} 分 {1} 秒"), (int)span.TotalMinutes, span.Seconds);
         }
         private static string Key(SavePair pair) { return pair == null ? "" : pair.SnapshotId + "/" + pair.FileStem; }
         private static void AddRow(DataGridView grid, SavePair pair, string detail)
         {
-            int index = grid.Rows.Add(pair.SaveName, pair.IsBackup ? "自动备份" : "主存档", pair.SavedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"), (pair.Length / 1024.0).ToString("N0") + " KB", detail);
+            int index = grid.Rows.Add(pair.SaveName, pair.IsBackup ? L.T("自动备份") : L.T("主存档"), pair.SavedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"), (pair.Length / 1024.0).ToString("N0") + " KB", detail);
             grid.Rows[index].Tag = pair;
         }
         private SavePair SelectedPair()
@@ -190,7 +233,7 @@ namespace BillionsSaveManager
         {
             if (populating) return;
             var pair = SelectedPair();
-            selectionDetail.Text = pair == null ? "选择一行存档或历史快照。" : "恢复目标：" + pair.SaveName + "  ·  " + pair.SavedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss") + (pair.IsBackup ? " 自动备份" : " 主存档快照");
+            selectionDetail.Text = pair == null ? L.T("选择一行存档或历史快照。") : L.T("恢复目标：{0} · {1} · {2}", pair.SaveName, pair.SavedAtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss"), (pair.IsBackup ? L.T("自动备份") : L.T("主存档快照")));
             UpdateButtons();
         }
         private void UpdateButtons()
@@ -199,12 +242,12 @@ namespace BillionsSaveManager
             restoreButton.Enabled = store != null && SelectedPair() != null && !blocked && !gameRunning;
             captureButton.Enabled = store != null && SelectedPair() != null && !blocked;
             refreshButton.Enabled = store != null && !blocked; folderButton.Enabled = !blocked;
-            tabs.Enabled = !blocked; automaticBox.Enabled = !blocked;
+            tabs.Enabled = !blocked; automaticBox.Enabled = !blocked; languageBox.Enabled = !blocked;
         }
         private void CheckGame()
         {
-            try { gameRunning = host != null && host.Observe().Running; gameLabel.Text = gameRunning ? "游戏正在运行" : "游戏已退出"; gameLabel.ForeColor = gameRunning ? Color.FromArgb(160,96,24) : accent; }
-            catch (Exception e) { gameRunning = true; gameLabel.Text = "游戏状态未知"; Log(e.Message); }
+            try { gameRunning = host != null && host.Observe().Running; gameLabel.Text = gameRunning ? L.T("游戏正在运行") : L.T("游戏已退出"); gameLabel.ForeColor = gameRunning ? Color.FromArgb(160,96,24) : accent; }
+            catch (Exception e) { gameRunning = true; gameLabel.Text = L.T("游戏状态未知"); Log(e.Message); }
             UpdateButtons();
         }
 
@@ -212,9 +255,9 @@ namespace BillionsSaveManager
         {
             var pair = SelectedPair(); if (pair == null || working || coordinator == null) return;
             working = true; UpdateButtons();
-            SetStatus("请暂时不要点击游戏里的继续", "工具正在保留原件。接下来会启动游戏，等到主菜单后处理回退文件。", false);
+            SetStatus(L.T("请暂时不要点击游戏里的继续"), L.T("工具正在保留原件。接下来会启动游戏，等到主菜单后处理回退文件。"), false);
             try { await Task.Run(delegate { coordinator.Begin(pair); }); ShowCoordinator(); }
-            catch (Exception error) { SetStatus("尚未开始回退",error.Message,true); Log(error.Message); }
+            catch (Exception error) { SetStatus(L.T("尚未开始回退"),error.Message,true); Log(error.Message); }
             finally { working = false; UpdateButtons(); }
         }
 
@@ -222,8 +265,8 @@ namespace BillionsSaveManager
         {
             var pair = SelectedPair(); if (pair == null || store == null || working) return;
             working = true; UpdateButtons();
-            try { await Task.Run(delegate { store.Capture(pair.SaveName,"手动备份",false); }); Log("已备份当前磁盘上的「" + pair.SaveName + "」，完整性校验通过。"); Populate(); }
-            catch (Exception error) { Log(error.Message); MessageBox.Show(this,error.Message,"备份未完成",MessageBoxButtons.OK,MessageBoxIcon.Information); }
+            try { await Task.Run(delegate { store.Capture(pair.SaveName,"manual",false); }); Log(L.T("已备份当前磁盘上的「{0}」，完整性校验通过。", pair.SaveName)); Populate(); }
+            catch (Exception error) { Log(error.Message); MessageBox.Show(this,error.Message,L.T("备份未完成"),MessageBoxButtons.OK,MessageBoxIcon.Information); }
             finally { working = false; UpdateButtons(); }
         }
 
@@ -269,10 +312,10 @@ namespace BillionsSaveManager
                     string signature = string.Join("|",slot.OrderBy(p => p.FileStem).Select(p => p.FileStem + ":" + SaveStore.HashFile(Path.Combine(p.Folder,p.FileStem + ".zxsav")) + ":" + SaveStore.HashFile(Path.Combine(p.Folder,p.FileStem + ".zxcheck"))).ToArray());
                     string previous;
                     if (observedVersions.TryGetValue(slot.Key,out previous) && previous == signature) continue;
-                    store.Capture(slot.Key,"自动保留",true); observedVersions[slot.Key] = signature;
-                    messages.Add("已检查并保留「" + slot.Key + "」的完整磁盘存档。");
+                    store.Capture(slot.Key,"automatic",true); observedVersions[slot.Key] = signature;
+                    messages.Add(L.T("已检查并保留「{0}」的完整磁盘存档。", slot.Key));
                 }
-                catch (IOException error) { if (error.Message != lastAutoError) { messages.Add("稍后重试备份：" + error.Message); lastAutoError = error.Message; } }
+                catch (IOException error) { if (error.Message != lastAutoError) { messages.Add(L.T("稍后重试备份：{0}", error.Message)); lastAutoError = error.Message; } }
             }
             return messages;
         }
@@ -281,7 +324,7 @@ namespace BillionsSaveManager
         {
             if (coordinator == null || coordinator.Message == lastCoordinatorMessage) return;
             lastCoordinatorMessage = coordinator.Message;
-            string title = coordinator.State == RollbackState.WaitingForMenu ? "正在等待游戏主菜单" : coordinator.State == RollbackState.AwaitingLoad ? "文件已准备好，现在可以点继续" : coordinator.State == RollbackState.Loaded ? "已确认游戏加载了恢复点" : "本次回退已停止";
+            string title = coordinator.State == RollbackState.WaitingForMenu ? L.T("正在等待游戏主菜单") : coordinator.State == RollbackState.AwaitingLoad ? L.T("文件已准备好，现在可以点继续") : coordinator.State == RollbackState.Loaded ? L.T("已确认游戏加载了恢复点") : L.T("本次回退已停止");
             SetStatus(title,coordinator.Message,coordinator.State == RollbackState.Failed); Log(coordinator.Message);
             if (coordinator.State == RollbackState.AwaitingLoad) { System.Media.SystemSounds.Asterisk.Play(); if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal; Activate(); }
             if (!coordinator.Busy) Populate();
@@ -294,7 +337,7 @@ namespace BillionsSaveManager
         }
         private void ChangeFolder(object sender, EventArgs e)
         {
-            using (var dialog = new FolderBrowserDialog { Description = "选择游戏的 Saves 目录", SelectedPath = settings.SaveDirectory, ShowNewFolderButton = false })
+            using (var dialog = new FolderBrowserDialog { Description = L.T("选择游戏的 Saves 目录"), SelectedPath = settings.SaveDirectory, ShowNewFolderButton = false })
             {
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
                 settings.SaveDirectory = dialog.SelectedPath; SaveSettings(); InitializeStore();
@@ -304,7 +347,7 @@ namespace BillionsSaveManager
         {
             if (string.IsNullOrEmpty(settingsPath)) return;
             try { Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)); SaveStore.WriteJson(settingsPath,settings); }
-            catch (Exception e) { Log("设置保存失败：" + e.Message); }
+            catch (Exception e) { Log(L.T("设置保存失败：{0}", e.Message)); }
         }
         private void OpenArchive()
         {
@@ -314,7 +357,7 @@ namespace BillionsSaveManager
         private void ClosingForm(object sender, FormClosingEventArgs e)
         {
             if (working || polling) { e.Cancel = true; return; }
-            if (coordinator != null && coordinator.Busy && MessageBox.Show(this,"回退流程尚未完成。关闭后将停止日志验证；已保留的快照和原件仍在。确定关闭工具吗？","回退尚未完成",MessageBoxButtons.YesNo,MessageBoxIcon.Information) != DialogResult.Yes)
+            if (coordinator != null && coordinator.Busy && MessageBox.Show(this,L.T("回退流程尚未完成。关闭后将停止日志验证；已保留的快照和原件仍在。确定关闭工具吗？"),L.T("回退尚未完成"),MessageBoxButtons.YesNo,MessageBoxIcon.Information) != DialogResult.Yes)
             { e.Cancel = true; return; }
             timer.Stop(); SaveSettings();
         }

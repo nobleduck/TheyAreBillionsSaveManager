@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Path $outRoot,$testRoot -Force | Out-Null
 $references = @('/r:System.dll','/r:System.Core.dll','/r:System.Runtime.Serialization.dll','/r:System.Windows.Forms.dll','/r:System.Drawing.dll')
 $core = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Filter '*.cs' | Where-Object Name -notin @('Program.cs','MainForm.cs') | ForEach-Object FullName)
 if ($Test) {
-    & $compiler /nologo /warn:4 /warnaserror /target:exe /platform:anycpu /out:"$testRoot\CoreTests.exe" @references @core (Join-Path $projectRoot 'tests\CoreTests.cs')
+    & $compiler /nologo /warn:4 /warnaserror /target:exe /platform:anycpu /out:"$testRoot\CoreTests.exe" @references @core (Join-Path $projectRoot 'tests\CoreTests.cs') (Join-Path $projectRoot 'tests\LocalizationTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Test compilation failed.' }
     & "$testRoot\CoreTests.exe"
     if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }

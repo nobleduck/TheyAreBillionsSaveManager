@@ -18,7 +18,7 @@ namespace BillionsSaveManager
             var processes = new[] { "TheyAreBillions", "TheyAreBillions_x86", "ZXGame" }.SelectMany(Process.GetProcessesByName).ToArray();
             try
             {
-                if (processes.Length > 1) throw new InvalidOperationException("检测到多个游戏进程，请先退出多余的游戏窗口。");
+                if (processes.Length > 1) throw new LocalizedInvalidOperationException("检测到多个游戏进程，请先退出多余的游戏窗口。");
                 if (processes.Length == 1)
                 {
                     result.Running = true; result.ProcessId = processes[0].Id; result.StartedUtc = processes[0].StartTime.ToUniversalTime();
@@ -48,7 +48,7 @@ namespace BillionsSaveManager
                 if (key != null) steamDirectory = key.GetValue("SteamPath") as string;
             if (string.IsNullOrEmpty(steamDirectory)) steamDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam");
             string executable = Path.Combine(steamDirectory, "steam.exe");
-            if (!File.Exists(executable)) throw new FileNotFoundException("未找到 Steam，请安装并登录 Steam 后重试。", executable);
+            if (!File.Exists(executable)) throw new LocalizedFileNotFoundException("未找到 Steam，请安装并登录 Steam 后重试。", executable);
             using (var process = Process.Start(new ProcessStartInfo(executable, "-applaunch 644930") { UseShellExecute = true, WindowStyle = ProcessWindowStyle.Hidden })) { }
         }
     }
