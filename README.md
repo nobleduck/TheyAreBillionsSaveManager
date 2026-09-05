@@ -1,8 +1,14 @@
 # They Are Billions 存档回退助手
 
-一个中文 Windows 桌面工具，帮助你保留存档快照，并从游戏自动备份或历史快照恢复生存模式进度。
+[English](README.en.md) | 简体中文
+
+一个支持中文和英文的 Windows 桌面工具，帮助你保留存档快照，并从游戏自动备份或历史快照恢复生存模式进度。
+
+**[下载最新版本](https://github.com/nobleduck/TheyAreBillionsSaveManager/releases/latest)** · [直接下载 EXE](https://github.com/nobleduck/TheyAreBillionsSaveManager/releases/latest/download/TheyAreBillionsSaveManager.exe)
 
 ## 直接使用
+
+在 Release 的 **Assets** 中下载 `TheyAreBillionsSaveManager-v0.2.0-windows.zip` 并解压。GitHub 自动提供的 **Source code** 是源码，需要自己构建。
 
 双击项目根目录中的 **`Start.cmd`**，或者运行 **`dist/TheyAreBillionsSaveManager.exe`**。程序使用 Windows 10 / 11 自带的 .NET Framework，不需要 Python、Node.js 或额外安装包。
 
@@ -13,6 +19,12 @@
 工具只有在游戏日志确认目标文件已经加载后，才显示 **“已确认游戏加载了恢复点”**。之后正常游玩即可；结束时正常保存退出，并等待 Steam 云同步完成。
 
 **回退过程中不要提前点击继续，也不要在文件准备好后重新启动游戏。** 如果误点，工具会停止并保留原件，退出游戏后再操作即可。
+
+## 语言
+
+首次打开时跟随当前 Windows 显示语言：中文环境使用简体中文，其他语言使用英文。右上角 **语言 / Language** 可随时切换并记住选择，无需重启。回退或备份执行期间暂时禁用切换。
+
+界面、回退状态、工具自身的错误提示以及历史快照原因均支持两种语言；存档名称和文件内容保持原样。活动记录保留产生时的语言，Windows 自身的错误和系统对话框由系统语言决定。旧版本的设置和中文快照原因仍然兼容。
 
 ## 为什么要先启动游戏
 
@@ -85,7 +97,7 @@ Steam 在启动前会检查存档。如果只在游戏关闭时移开主存档�
 .\build.ps1 -Test -UiSmoke
 ```
 
-核心测试只在随机临时目录里使用测试文件，不操作真实游戏存档。界面测试创建独立的测试窗口并输出 `build/ui-preview.png` 与 `build/ui-preview-compact.png`。
+核心测试只在随机临时目录里使用测试文件，不操作真实游戏存档。界面测试检查两种语言、正常和最小窗口大小、语言切换及设置持久化，输出 `build/ui-preview-*.png`。
 
 生成便携压缩包：
 
@@ -93,7 +105,9 @@ Steam 在启动前会检查存档。如果只在游戏关闭时移开主存档�
 .\build.ps1 -Test -Package
 ```
 
-产物为 `dist/TheyAreBillionsSaveManager-v0.1.0-windows.zip`，解压后双击 `Start.cmd`。
+产物为 `dist/TheyAreBillionsSaveManager-v0.2.0-windows.zip`、独立 EXE 和 `SHA256SUMS.txt`。版本号统一由根目录 `VERSION` 控制。
+
+构建脚本会执行检查并生成下载包。发布步骤见 [发布指南](docs/RELEASING.md)。
 
 ## 项目结构
 
@@ -103,7 +117,9 @@ src/
   GameLog.cs               解析游戏日志
   RollbackCoordinator.cs   启动、主菜单、文件准备、读档确认
   WindowsGameHost.cs       Steam 启动与只读进程/日志检查
-  MainForm.cs              中文 WinForms 界面
+  MainForm.cs              中英文 WinForms 界面
+  Localization.cs          翻译与语言选择
+  LocalizedErrors.cs       支持切换语言的错误提示
   Models.cs / AppSettings.cs / Program.cs
 tests/                    核心回归测试与界面检查
 docs/superpowers/          设计与实现计划
@@ -111,4 +127,4 @@ build.ps1                 零依赖构建
 Start.cmd                 双击启动入口
 ```
 
-发布源码时保留源码、测试、文档和构建脚本即可。`.gitignore` 已排除真实存档、设置、快照、构建目录和可执行文件。可执行文件可以另行打包为 Release；本项目尚未绑定远程仓库，也未指定开源许可证。
+`.gitignore` 已排除真实存档、设置、快照、构建目录和可执行文件。下载包通过 GitHub Releases 分发。本项目尚未指定开源许可证。
