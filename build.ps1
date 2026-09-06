@@ -39,7 +39,7 @@ if ($Package) {
     $packageDist = Join-Path $packageRoot 'dist'
     New-Item -ItemType Directory -Path $packageDist -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $outRoot 'TheyAreBillionsSaveManager.exe') -Destination $packageDist -Force
-    $packageFiles = @('README.md','README.en.md','CHANGELOG.md','Start.cmd') | ForEach-Object { Join-Path $projectRoot $_ }
+    $packageFiles = @('README.md','README.zh-CN.md','CHANGELOG.md','Start.cmd') | ForEach-Object { Join-Path $projectRoot $_ }
     Copy-Item -LiteralPath $packageFiles -Destination $packageRoot -Force
     $zipPath = Join-Path $outRoot ('TheyAreBillionsSaveManager-v' + $releaseVersion + '-windows.zip')
     Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $zipPath -Force
